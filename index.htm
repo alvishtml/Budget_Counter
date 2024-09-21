@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>進階預算計算器</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        input[type="number"], input[type="date"], input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .result, .history, .total-savings, .monthly-summary, .category-progress, .category-report, .budget-alert {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+        .clear-btn {
+            background-color: #dc3545;
+            margin-top: 20px;
+        }
+        .clear-btn:hover {
+            background-color: #c82333;
+        }
+        canvas {
+            margin-top: 20px;
+        }
+        .progress-bar {
+            width: 100%;
+            background-color: #f4f4f4;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .progress-bar div {
+            height: 20px;
+            background-color: #28a745;
+            text-align: center;
+            color: white;
+            border-radius: 5px;
+        }
+        .category-list {
+            margin-top: 20px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>進階預算計算器</h1>
+
+    <label for="income">總收入：</label>
+    <input type="number" id="income" placeholder="輸入你的總收入">
+
+    <label for="custom-category">新增自訂類別：</label>
+    <input type="text" id="custom-category" placeholder="輸入新的類別">
+    <button onclick="addCategory()">新增類別</button>
+
+    <h2>管理類別</h2>
+    <div class="category-list" id="category-list"></div>
+
+    <label for="category">支出類別：</label>
+    <select id="category">
+        <option value="租金">租金</option>
+        <option value="食品雜貨">食品雜貨</option>
+        <option value="水電費">水電費</option>
+        <option value="娛樂">娛樂</option>
+        <option value="其他">其他</option>
+    </select>
+
+    <label for="subcategory">子類別（可選）：</label>
+    <input type="text" id="subcategory" placeholder="輸入子類別">
+
+    <label for="expenses">總支出：</label>
+    <input type="number" id="expenses" placeholder="輸入你的總支出">
+
+    <label for="currency">貨幣：</label>
+    <select id="currency">
+        <option value="TWD">新台幣</option>
+        <option value="USD">美元</option>
+        <option value="EUR">歐元</option>
+    </select>
+
+    <button onclick="calculateBudget()">計算預算</button>
+
+    <div class="result" id="result"></div>
+    <div class="budget-alert" id="budget-alert"></div>
+
+    <div class="category-progress" id="category-progress"></div>
+
+    <h2>預算歷史</h2>
+    <div class="history" id="history"></div>
+
+    <canvas id="expenseChart" width="400" height="400"></canvas>
+
+    <button class="clear-btn" onclick="clearHistory()">清除歷史</button>
+</div>
+
+<script>
+    let expenseData = {};
+    let categories = ["租金", "食品雜貨", "水電費", "娛樂", "其他"];
+
+    function calculateBudget() {
+        var income = parseFloat(document.getElementById('income').value) || 0;
+        var expenses = parseFloat(document.getElementById('expenses').value) || 0;
+        var category = document.getElementById('category').value;
+        var currency = document.getElementById('currency').value;
+
+        var budget = income - expenses;
+        var result = document.getElementById('result');
+        var message = budget >= 0
+            ? `你還有 ${currency} ${budget} 的預算。`
+            : `你超出預算 ${currency} ${Math.abs(budget)}。`;
+        result.textContent = message;
+        result.style.color = budget >= 0 ? "green" : "red";
+
+        updateExpenseData(category, expenses);
+        renderExpenseChart();
+
+        saveToHistory(income, expenses, category, currency);
+        displayHistory();
+    }
+
+    function updateExpenseData(category, expenses) {
+        if (!expenseData[category]) {
+            expenseData[category] = 0;
+        }
+        expenseData[category] += parseFloat(expenses);
+    }
+
+    function renderExpenseChart() {
+        var ctx = document.getElementById('expenseChart').getContext('2d');
+        var labels = Object.keys(expenseData);
+        var data = Object.values(expenseData);
+
+        if (window.expenseChart) {
+            window.expenseChart.destroy(); // Destroy the old chart instance
+        }
+
+        window.expenseChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '支出分佈',
+                    data: data,
+                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'],
+                    hoverBackgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
+                }]
+            },
+            options: { responsive: true }
+        });
+    }
+
+    function saveToHistory(income, expenses, category, currency) {
+        var history = JSON.parse(localStorage.getItem('budgetHistory')) || [];
+        var entry = {
+            income: income,
+            expenses: expenses,
+            category: category,
+            currency: currency,
+            date: new Date().toLocaleString()
+        };
+        history.push(entry);
+        localStorage.setItem('budgetHistory', JSON.stringify(history));
+    }
+
+    function displayHistory() {
+        var history = JSON.parse(localStorage.getItem('budgetHistory')) || [];
+        var historyDiv = document.getElementById('history');
+        historyDiv.innerHTML = history.map(entry => `
+            <div>
+                <strong>日期：</strong> ${entry.date}<br>
+                <strong>收入：</strong> ${entry.income}<br>
+                <strong>支出：</strong> ${entry.expenses}<br>
+                <strong>類別：</strong> ${entry.category}<br>
+                <strong>貨幣：</strong> ${entry.currency}<br>
+            </div>
+        `).join('<br>');
+    }
+
+    function clearHistory() {
+        localStorage.removeItem('budgetHistory');
+        document.getElementById('history').innerHTML = '';
+        expenseData = {}; // Reset expense data
+        renderExpenseChart(); // Clear the chart
+    }
+
+    window.onload = function() {
+        displayHistory();
+        renderExpenseChart(); // Render initial empty chart
+    };
+
+    function addCategory() {
+        var newCategory = document.getElementById('custom-category').value;
+        if (newCategory && !categories.includes(newCategory)) {
+            categories.push(newCategory);
+            updateCategoryList();
+            document.getElementById('custom-category').value = ''; // Clear input field
+        }
+    }
+
+    function updateCategoryList() {
+        var categoryListDiv = document.getElementById('category-list');
+        categoryListDiv.innerHTML = categories.map(category => `
+            <div>
+                ${category} <button onclick="deleteCategory('${category}')">刪除</button>
+            </div>
+        `).join('');
+    }
+
+    function deleteCategory(category) {
+        categories = categories.filter(c => c !== category);
+        updateCategoryList();
+    }
+</script>
+
+</body>
+</html>
